@@ -122,7 +122,6 @@ if __name__ == "__main__":
     print(f"Classification report: \n{classification_report(y_test, y_pred)}")
     
     # Plot ROC curve
-
     fpr, tpr, threshold = roc_curve(y_test, y_pred)
     roc_auc = auc(fpr, tpr)
 
