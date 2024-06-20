@@ -7,7 +7,7 @@ X = data.iloc[:,1]
 y = data.iloc[:,0]
 num_examples = X.shape[0]
 file = open("../Datasets/cleaned_combined_data.csv", "w+",  encoding='utf-8')
-
+file.write("label,text\n")
 def detect_language(text):
     try:
         return detect(text)
