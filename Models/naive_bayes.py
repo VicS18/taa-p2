@@ -21,7 +21,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from nltk.stem.snowball import EnglishStemmer
 from nltk.corpus import stopwords
 
-LOAD_MODEL = False
+LOAD_MODEL = True
 
 DATASET_PATH = '../Datasets/combined_data.csv'
 TEXT_LABEL = 'text'
