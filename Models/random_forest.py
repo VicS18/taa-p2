@@ -98,9 +98,9 @@ if __name__ == "__main__":
     # Train model
     if not LOAD_MODEL:
         param_grid = {
-            'n_estimators': [400],
-            'use_idf': [True],
-            'chi_portion': [0.5]
+            'n_estimators': [50, 100, 200, 300, 400],
+            'use_idf': [True, False],
+            'chi_portion': [0.5, 0.7, 1.0]
         }
         clf = GridSearchCV(estimator=ForestClassifier(), param_grid=param_grid, scoring='f1', n_jobs=5, verbose=3, error_score='raise')
         clf.fit(X_train, y_train)
