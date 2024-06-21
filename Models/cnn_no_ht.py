@@ -1,5 +1,6 @@
 import re
 import string
+from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import time
@@ -11,6 +12,9 @@ from sklearn.model_selection import train_test_split
 from nltk.corpus import stopwords
 from nltk.stem.snowball import EnglishStemmer
 
+from sklearn.metrics import accuracy_score, confusion_matrix, roc_curve, auc
+
+
 # Ensure stopwords are downloaded
 nltk.download('stopwords')
 STOP_WORDS = set(stopwords.words('english')).union({"escapenumber"})
@@ -20,10 +24,14 @@ TEXT_LABEL = 'text'
 SPAM_LABEL = 'label'
 BATCH_SIZE = 16
 
+LOAD_MODEL = False
+
 # Data loading function
 def load_data(filename, test_size=0.3):
     print("Loading dataset...")
     emails = pd.read_csv(filename)
+
+    emails = emails.sample(n=30_000, random_state=1)
 
     labels = emails[SPAM_LABEL].values
     texts = emails[TEXT_LABEL].values
@@ -36,8 +44,8 @@ def load_data(filename, test_size=0.3):
 
 # Model creation function
 def create_model(vectorizer):
-    embedding_dim = 64
-    conv_units = 16
+    embedding_dim = 128
+    conv_units = 32
     kernel_size = 3
     dense_units = 128
 
@@ -60,6 +68,37 @@ def create_model(vectorizer):
 
     return model
 
+# Plotting functions
+def plot_roc_auc(y_true, y_pred_proba):
+    fpr, tpr, _ = roc_curve(y_true, y_pred_proba)
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure()
+    lw = 2
+    plt.plot(fpr, tpr, color='darkorange', lw=lw, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.legend(loc="lower right")
+    plt.show()
+
+def plot_confusion_matrix(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(8, 6))
+    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title('Confusion Matrix')
+    plt.colorbar()
+    tick_marks = np.arange(len(np.unique(y_true)))
+    plt.xticks(tick_marks, ['Not Spam', 'Spam'], rotation=45)
+    plt.yticks(tick_marks, ['Not Spam', 'Spam'])
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
+
 # Main script
 if __name__ == "__main__":
     # Configure TensorFlow to only allocate memory as needed
@@ -81,16 +120,31 @@ if __name__ == "__main__":
 
     print(f"Loading + preprocessing time: {time.time() - start}")
 
-    print("=== TRAINING ===")
-    model = create_model(vectorize_layer)
-
     train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train)).batch(BATCH_SIZE)
     val_dataset = tf.data.Dataset.from_tensor_slices((X_val, y_val)).batch(BATCH_SIZE)
-
-    model.fit(train_dataset, validation_data=val_dataset, epochs=50, batch_size=BATCH_SIZE)
+    
+    if not LOAD_MODEL:
+        print("=== TRAINING ===")
+        model = create_model(vectorize_layer)
+        model.fit(train_dataset, validation_data=val_dataset, epochs=50, batch_size=BATCH_SIZE)
+        model.save('cnn_no_ht.h5')
+    else:
+        model = tf.keras.models.load_model('cnn_no_ht.h5')
 
     print("=== EVALUATION ===")
     test_dataset = tf.data.Dataset.from_tensor_slices((X_test, y_test)).batch(BATCH_SIZE)
-    model.evaluate(test_dataset)
-
+    loss, accuracy = model.evaluate(test_dataset)
+    
     model.summary()
+
+    print(f"Test Loss: {loss:.4f}")
+    print(f"Test Accuracy: {accuracy:.4f}")
+
+    y_pred_proba = model.predict(test_dataset)
+    y_pred = np.where(y_pred_proba > 0.5, 1, 0)  # Assuming threshold of 0.5 for binary classification
+
+    # Plot ROC curve
+    plot_roc_auc(y_test, y_pred_proba)
+
+    # Plot confusion matrix
+    plot_confusion_matrix(y_test, y_pred)
