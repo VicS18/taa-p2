@@ -55,7 +55,7 @@ def create_rnn_model(embedding_dim=EMBEDDING_DIM, max_sequence_length=MAX_SEQUEN
     return model
 
 def perform_grid_search(X_train_seq, y_train):
-    early_stopping = EarlyStopping(monitor='val_loss', patience=1, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
     
     model = KerasClassifier(model=create_rnn_model, verbose=1, callbacks=[early_stopping])
 
