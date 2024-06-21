@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.metrics import classification_report, roc_curve, auc
-from keras.wrappers.scikit_learn import KerasClassifier
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
-from keras.models import Sequential
-from keras.layers import Embedding, LSTM, Dense, Dropout
-from keras.callbacks import EarlyStopping
+from scikeras.wrappers import KerasClassifier
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
 import tensorflow as tf
 
 from nltk.corpus import stopwords
@@ -31,6 +31,7 @@ STOP_WORDS = set(stopwords.words('english')).union({"escapenumber"})
 # Text dataset processing
 def load_data(filename, test_size=0.3):
     df = pd.read_csv(filename)
+    print("Loaded data shape: ", df.shape)
     return train_test_split(df[TEXT_LABEL], df[SPAM_LABEL], test_size=test_size)
 
 # Tokenize and pad sequences
@@ -45,11 +46,32 @@ def preprocess_text(texts, max_num_words=MAX_NUM_WORDS, max_sequence_length=MAX_
 # Create RNN model
 def create_rnn_model(embedding_dim=EMBEDDING_DIM, max_sequence_length=MAX_SEQUENCE_LENGTH, max_num_words=MAX_NUM_WORDS, lstm_units=128, dropout_rate=0.2):
     model = Sequential()
-    model.add(Embedding(input_dim=max_num_words, output_dim=embedding_dim, input_length=max_sequence_length))
+    model.add(Embedding(input_dim=max_num_words, output_dim=embedding_dim))
     model.add(LSTM(units=lstm_units, dropout=dropout_rate, recurrent_dropout=dropout_rate))
     model.add(Dense(1, activation='sigmoid'))
-    model.compile(loss='binary_crossentropy', optimizer='nadam', metrics=['accuracy'])
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    model.build(input_shape=(None, max_sequence_length))
+    model.summary()
     return model
+
+def perform_grid_search(X_train_seq, y_train):
+    early_stopping = EarlyStopping(monitor='val_loss', patience=1, restore_best_weights=True)
+    
+    model = KerasClassifier(model=create_rnn_model, verbose=1, callbacks=[early_stopping])
+
+    param_grid = {
+        'model__embedding_dim': [50, 100, 200],
+        'model__lstm_units': [128, 256],
+        'model__dropout_rate': [0.2, 0.5],
+        'batch_size': [32, 64, 128],
+        'epochs': [20]
+    }
+
+
+    grid = GridSearchCV(estimator=model, param_grid=param_grid, scoring='accuracy', n_jobs=1, cv=3, verbose=3)
+    grid_result = grid.fit(X_train_seq, y_train, validation_split=0.1)
+
+    return grid_result
 
 if __name__ == "__main__":
     # Ensure TensorFlow uses GPU
@@ -62,35 +84,23 @@ if __name__ == "__main__":
             print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
         except RuntimeError as e:
             print(e)
-
+    else:
+        print("No gpus found.")
     # Preprocess and split dataset
     X_train, X_test, y_train, y_test = load_data(DATASET_PATH, 0.3)
     X_train_seq, tokenizer, word_index = preprocess_text(X_train)
     X_test_seq = pad_sequences(tokenizer.texts_to_sequences(X_test), maxlen=MAX_SEQUENCE_LENGTH)
 
     if not LOAD_MODEL:
-        model = KerasClassifier(build_fn=create_rnn_model, verbose=1)
-
-        param_grid = {
-            'embedding_dim': [50, 100, 200],
-            'lstm_units': [128, 256],
-            'dropout_rate': [0.2, 0.5],
-            'batch_size': [32, 64, 128],
-            'epochs': [20]
-        }
-
-        early_stopping = EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
-
-        grid = GridSearchCV(estimator=model, param_grid=param_grid, scoring='accuracy', n_jobs=1, cv=3, verbose=3)
-        grid_result = grid.fit(X_train_seq, y_train, validation_split=0.1, callbacks=[early_stopping])
+        grid_result = perform_grid_search(X_train_seq, y_train)
 
         # Save the best model and tokenizer
-        best_model = grid_result.best_estimator_.model
+        best_model = grid_result.best_estimator_.model_
         print(f"\n=== Best model's params:\n {grid_result.best_params_}\n")
         best_model.save('rnn_classifier_best.h5')
         joblib.dump(tokenizer, 'tokenizer.pkl')
     else:
-        from keras.models import load_model
+        from tensorflow.keras.models import load_model
         best_model = load_model('rnn_classifier_best.h5')
         tokenizer = joblib.load('tokenizer.pkl')
 

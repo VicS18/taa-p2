@@ -19,7 +19,7 @@ from nltk.corpus import stopwords
 
 LOAD_MODEL = False
 
-DATASET_PATH = '../Datasets/combined_data.csv'
+DATASET_PATH = '../Datasets/cleaned_combined_data.csv'
 TEXT_LABEL = 'text'
 SPAM_LABEL = 'label'
 
