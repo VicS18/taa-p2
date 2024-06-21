@@ -12,7 +12,8 @@ import tensorflow as tf
 from tensorflow import keras
 
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0,2,3,4"
 
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Embedding, TextVectorization, GlobalAveragePooling1D
@@ -20,6 +21,14 @@ from keras.layers import Dense, Flatten, Embedding, TextVectorization, GlobalAve
 from tensorflow.data.experimental import make_csv_dataset
 from tensorflow.keras.utils import split_dataset
 from tensorflow.keras.losses import BinaryCrossentropy
+
+if tf.test.gpu_device_name():
+   print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+else:
+   print("Please install GPU version of TF")
+
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())
 
 
 from sklearn.base import BaseEstimator, ClassifierMixin
